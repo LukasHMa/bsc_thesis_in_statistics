@@ -132,24 +132,24 @@ param_grid_pol = {'C': [0.001, 0.1, 1, 5, 10, 50],
               'kernel': ['poly']}
 
 #standard SVM
-grid_gau = GridSearchCV(GauSVM, param_grid_gau, refit = True, verbose = 3) 
+grid_gau = GridSearchCV(GauSVM, param_grid_gau, refit = True, verbose = 3, n_jobs=-1) 
 
-grid_lin = GridSearchCV(LinearSVM, param_grid_lin, refit = True, verbose = 3)
+grid_lin = GridSearchCV(LinearSVM, param_grid_lin, refit = True, verbose = 3, n_jobs=-1)
 
-grid_sig = GridSearchCV(SigmSVM, param_grid_sig, refit = True, verbose = 3) 
+grid_sig = GridSearchCV(SigmSVM, param_grid_sig, refit = True, verbose = 3, n_jobs=-1) 
 
-grid_pol = GridSearchCV(PolySVM, param_grid_pol, refit = True, verbose = 3)
+grid_pol = GridSearchCV(PolySVM, param_grid_pol, refit = True, verbose = 3, n_jobs=-1)
 
 
 
 #Cost sensitive SVM
-grid_gau_w = GridSearchCV(GauSVM_w, param_grid_gau, refit = True, verbose = 3) 
+grid_gau_w = GridSearchCV(GauSVM_w, param_grid_gau, refit = True, verbose = 3, n_jobs=-1) 
 
-grid_lin_w = GridSearchCV(LinearSVM_w, param_grid_lin, refit = True, verbose = 3)
+grid_lin_w = GridSearchCV(LinearSVM_w, param_grid_lin, refit = True, verbose = 3, n_jobs=-1)
 
-grid_sig_w = GridSearchCV(SigmSVM_w, param_grid_sig, refit = True, verbose = 3) 
+grid_sig_w = GridSearchCV(SigmSVM_w, param_grid_sig, refit = True, verbose = 3, n_jobs=-1) 
 
-grid_pol_w = GridSearchCV(PolySVM_w, param_grid_pol, refit = True, verbose = 3)    
+grid_pol_w = GridSearchCV(PolySVM_w, param_grid_pol, refit = True, verbose = 3, n_jobs=-1)    
 
 classifiers = [grid_lin,grid_gau,grid_sig,grid_pol]
 
@@ -161,11 +161,14 @@ prediction_test = []
 best_model = []
 probability_train = []
 probability_test = []
+svm_out_train = []
+svm_out_test = []
 
 for clf in classifiers:
     clf.fit(Train_X, Train_Y.values.ravel())
     best_model.append(clf.best_estimator_)
     
+    #prediction
     pred_train = clf.predict(Train_X)
     pred_test = clf.predict(Test_X)
     pred_train = pd.Series(index=Train_Y.index, data=pred_train)
@@ -174,6 +177,7 @@ for clf in classifiers:
     prediction_train.append(pred_train)
     prediction_test.append(pred_test)
     
+    #probability output (alternative calibration)
     pred_p_train = clf.predict_proba(Train_X)
     pred_p_test = clf.predict_proba(Test_X)
     
@@ -183,16 +187,30 @@ for clf in classifiers:
     probability_train.append(pred_p_train)
     probability_test.append(pred_p_test)
     
+    # SVM score (distantce to hyperplane)
+    out_train = clf.decision_function(Train_X)
+    out_test = clf.decision_function(Test_X)
+    
+    out_train = pd.DataFrame(index=Train_Y.index, data=out_train)
+    out_test = pd.DataFrame(index=Test_Y.index, data=out_test)
+    
+    svm_out_train.append(out_train)
+    svm_out_test.append(out_test)
+    
 prediction_train_w = []
 prediction_test_w = []
 best_model_w = []
 probability_train_w = []
 probability_test_w = []
+svm_out_train_w = []
+svm_out_test_w = []
+
     
 for clf in classifiers_w:
     clf.fit(Train_X, Train_Y.values.ravel())
     best_model_w.append(clf.best_estimator_)
     
+    #prediction
     pred_train_w = clf.predict(Train_X)
     pred_test_w = clf.predict(Test_X)
     pred_train_w = pd.Series(index=Train_Y.index, data=pred_train_w)
@@ -201,6 +219,7 @@ for clf in classifiers_w:
     prediction_train_w.append(pred_train_w)
     prediction_test_w.append(pred_test_w)
     
+    #probability output (alternative calibration)
     pred_p_train_w = clf.predict_proba(Train_X)
     pred_p_test_w = clf.predict_proba(Test_X)
     
@@ -209,6 +228,16 @@ for clf in classifiers_w:
     
     probability_train_w.append(pred_p_train_w)
     probability_test_w.append(pred_p_test_w)
+    
+    # SVM score (distantce to hyperplane)
+    out_train_w = clf.decision_function(Train_X)
+    out_test_w = clf.decision_function(Test_X)
+    
+    out_train_w = pd.DataFrame(index=Train_Y.index, data=out_train_w)
+    out_test_w = pd.DataFrame(index=Test_Y.index, data=out_test_w)
+    
+    svm_out_train.append(out_train_w)
+    svm_out_test.append(out_test_w)
 
 elapsed_time = (time.time() - start_time)/60
 
@@ -226,7 +255,7 @@ prob_support_num = []
 
 for clf in classifiers:
     prob_best_model.append(clf.best_estimator_.dual_coef_)
-    prob_model_bias.append(clf.best_estimator_.intercept_)
+    prob_model_bias.append(clf.best_estimator_.intercept_) 
     prob_support.append(clf.best_estimator_.support_vectors_)
     prob_support_num.append(clf.best_estimator_.n_support_)
 
@@ -246,150 +275,6 @@ print(best_model_w)
 #Print results
 #In-sample
 
-#%%
-#create confusion matrix for in-sample classification
-axis_title = ['Linear kernel, C=0.001',
-              'Gaussian kernel, C=0.001',
-              'Sigmoid kernel, C=0.001',
-              'Polynomial kernel, C=0.1']
-fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(15,10))
-# fig.suptitle('In-sample accuracy (Scenario II, b = -3)',fontsize=20)
-# fig.suptitle('In-sample accuracy (Scenario II, b = -5)',fontsize=20)
-# fig.suptitle('In-sample accuracy (Scenario II, b = -7)',fontsize=20)
-fig.suptitle('In-sample accuracy (Scenario I, b = -3)',fontsize=20)
-# fig.suptitle('In-sample accuracy (Scenario I, b = -5)',fontsize=20)
-# fig.suptitle('In-sample accuracy (Scenario III, b = -3)',fontsize=20)
-# fig.suptitle('In-sample accuracy (Scenario III, b = -5)',fontsize=20)
-# fig.suptitle('In-sample accuracy (Scenario III, b = -7)',fontsize=20)
-
-
-for cls, ax, title in zip(classifiers, axes.flatten(), axis_title):
-    plot_confusion_matrix(cls, 
-                          Train_X, 
-                          Train_Y,
-                          labels=[1, 0],
-                          ax=ax, 
-                         cmap=plt.cm.Blues)
-    ax.title.set_text(title)
-            
-plt.tight_layout()  
-# plt.savefig('svm_in_med_3.png', dpi=300)
-# plt.savefig('svm_in_med_5.png', dpi=300) 
-# plt.savefig('svm_in_med_7.png', dpi=300) 
-plt.savefig('svm_in_small_3.png', dpi=300) 
-# plt.savefig('svm_in_small_5.png', dpi=300)  
-plt.show()
-
-#%%
-#Out-of-sample
-
-#create confusion matrix for in-sample classification
-axis_title = ['Linear kernel, C=0.001',
-              'Gaussian kernel, C=0.001',
-              'Sigmoid kernel, C=0.001',
-              'Polynomial kernel, C=0.1']
-fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(15,10))
-# fig.suptitle('Out-of-sample accuracy (Scenario II, b = -3)',fontsize=20)
-# fig.suptitle('Out-of-sample accuracy (Scenario II, b = -5)',fontsize=20)
-# fig.suptitle('Out-of-sample accuracy (Scenario II, b = -7)',fontsize=20)
-fig.suptitle('Out-of-sample accuracy (Scenario I, b = -3)',fontsize=20)
-# fig.suptitle('Out-of-sample accuracy (Scenario I, b = -5)',fontsize=20)
-# fig.suptitle('Out-of-sample accuracy (Scenario III, b = -3)',fontsize=20)
-# fig.suptitle('Out-of-sample accuracy(Scenario III, b = -5)',fontsize=20)
-# fig.suptitle('Out-of-sample accuracy (Scenario III, b = -7)',fontsize=20)
-
-
-for cls, ax, title in zip(classifiers, axes.flatten(), axis_title):
-    plot_confusion_matrix(cls, 
-                          Test_X, 
-                          Test_Y,
-                          labels=[1, 0], 
-                          ax=ax, 
-                         cmap=plt.cm.Blues)
-    ax.title.set_text(title)
-            
-plt.tight_layout()  
-# plt.savefig('svm_out_med_3.png', dpi=300)
-# plt.savefig('svm_out_med_5.png', dpi=300) 
-# plt.savefig('svm_out_med_7.png', dpi=300) 
-plt.savefig('svm_out_small_3.png', dpi=300) 
-# plt.savefig('svm_out_small_5.png', dpi=300) 
-plt.show()
-
-#%%
-
-#Weighted SVM  
-
-#create confusion matrix for in-sample classification
-axis_title = ['Linear kernel, C=1 (DEC)',
-              'Gaussian kernel, C=0.1  (DEC)',
-              'Sigmoid kernel, C=0.1 (DEC)',
-              'Polynomial kernel, C=0.001 (DEC)']
-fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(15,10))
-# fig.suptitle('In-sample accuracy (Scenario II, b = -3)',fontsize=20)
-# fig.suptitle('In-sample accuracy, DEC (Scenario II, b = -5)',fontsize=20)
-# fig.suptitle('In-sample accuracy, DEC (Scenario II, b = -7)',fontsize=20)
-fig.suptitle('In-sample accuracy, DEC (Scenario I, b = -3)',fontsize=20)
-# fig.suptitle('In-sample accuracy, DEC (Scenario I, b = -5)',fontsize=20)
-# fig.suptitle('In-sample accuracy, DEC (Scenario III, b = -3)',fontsize=20)
-# fig.suptitle('In-sample accuracy, DEC (Scenario III, b = -5)',fontsize=20)
-# fig.suptitle('In-sample accuracy, DEC (Scenario III, b = -7)',fontsize=20)
-
-
-
-for cls, ax, title in zip(classifiers_w, axes.flatten(), axis_title):
-    plot_confusion_matrix(cls, 
-                          Train_X, 
-                          Train_Y, 
-                          ax=ax,
-                          labels=[1, 0], 
-                         cmap=plt.cm.Blues,
-                         values_format="d")
-    ax.title.set_text(title)
-            
-plt.tight_layout()  
-# plt.savefig('svm_in_med_3_w.png', dpi=300)
-# plt.savefig('svm_in_med_5_w.png', dpi=300) 
-# plt.savefig('svm_in_med_7_w.png', dpi=300) 
-plt.savefig('svm_in_small_3_w.png', dpi=300) 
-# plt.savefig('svm_in_small_5_w.png', dpi=300)
-# plt.savefig('svm_in_large_3_w.png', dpi=300) 
-# plt.savefig('svm_in_large_5_w.png', dpi=300) 
-# plt.savefig('svm_in_large_7_w.png', dpi=300)   
-plt.show()
-
-#%%
-#Out-of-sample
-
-#create confusion matrix for in-sample classification
-axis_title = ['Linear kernel, C=1 (DEC)',
-              'Gaussian kernel, C=0.1  (DEC)',
-              'Sigmoid kernel, C=0.1 (DEC)',
-              'Polynomial kernel, C=0.001 (DEC)']
-fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(15,10))
-# fig.suptitle('Out-of-sample accuracy (Scenario II, b = -3)',fontsize=20)
-# fig.suptitle('Out-of-sample accuracy (Scenario II, b = -5)',fontsize=20)
-# fig.suptitle('Out-of-sample accuracy (Scenario II, b = -7)',fontsize=20)
-fig.suptitle('Out-of-sample accuracy (Scenario I, b = -3)',fontsize=20)
-# fig.suptitle('Out-of-sample accuracy (Scenario I, b = -5)',fontsize=20)
-
-for cls, ax, title in zip(classifiers_w, axes.flatten(), axis_title):
-    plot_confusion_matrix(cls, 
-                          Test_X, 
-                          Test_Y, 
-                          ax=ax, 
-                          labels=[1, 0], 
-                         cmap=plt.cm.Blues,
-                         values_format="d")
-    ax.title.set_text(title)
-            
-plt.tight_layout()  
-# plt.savefig('svm_out_med_3_w.png', dpi=300)
-# plt.savefig('svm_out_med_5_w.png', dpi=300) 
-# plt.savefig('svm_out_med_7_w.png', dpi=300) 
-plt.savefig('svm_out_small_3_w.png', dpi=300) 
-# plt.savefig('svm_out_small_5_w.png', dpi=300)  
-plt.show()
 
 
 #%%
@@ -452,21 +337,21 @@ for i in range(4):
 #%%
 # probability
 
-calib_lin = CalibratedClassifierCV(grid_lin, method='sigmoid', cv="prefit")
+calib_lin = CalibratedClassifierCV(grid_lin, method='sigmoid', cv=5, n_jobs=-1)
 
-calib_gau = CalibratedClassifierCV(grid_gau, method='sigmoid', cv="prefit")
+calib_gau = CalibratedClassifierCV(grid_gau, method='sigmoid', cv=5, n_jobs=-1)
 
-calib_sig = CalibratedClassifierCV(grid_sig, method='sigmoid', cv="prefit")
+calib_sig = CalibratedClassifierCV(grid_sig, method='sigmoid', cv=5, n_jobs=-1)
 
-calib_pol = CalibratedClassifierCV(grid_pol, method='sigmoid', cv="prefit")
+calib_pol = CalibratedClassifierCV(grid_pol, method='sigmoid', cv=5, n_jobs=-1)
 
-calib_lin_w = CalibratedClassifierCV(grid_lin_w, method='sigmoid', cv="prefit")
+calib_lin_w = CalibratedClassifierCV(grid_lin_w, method='sigmoid', cv=5, n_jobs=-1)
 
-calib_gau_w = CalibratedClassifierCV(grid_gau_w, method='sigmoid', cv="prefit")
+calib_gau_w = CalibratedClassifierCV(grid_gau_w, method='sigmoid', cv=5, n_jobs=-1)
 
-calib_sig_w = CalibratedClassifierCV(grid_sig_w, method='sigmoid', cv="prefit")
+calib_sig_w = CalibratedClassifierCV(grid_sig_w, method='sigmoid', cv=5, n_jobs=-1)
 
-calib_pol_w = CalibratedClassifierCV(grid_pol_w, method='sigmoid', cv="prefit")
+calib_pol_w = CalibratedClassifierCV(grid_pol_w, method='sigmoid', cv=5, n_jobs=-1)
 
 classifiers_calib = [calib_lin,calib_gau,calib_sig,calib_pol]
 
@@ -492,7 +377,8 @@ for clf in classifiers_calib:
     
     prob_prediction_train.append(prob_pred_train)
     prob_prediction_test.append(prob_pred_test)
-    #caliberated probability
+    
+    #calibrated probability
     cali_prob_train = clf.predict_proba(Train_X)
     cali_prob_test = clf.predict_proba(Test_X)
     
@@ -520,7 +406,8 @@ for clf in classifiers_calib_w:
     
     prob_prediction_train_w.append(prob_pred_train_w)
     prob_prediction_test_w.append(prob_pred_test_w)
-    #caliberated probability
+    
+    #calibrated probability
     cali_prob_train_w = clf.predict_proba(Train_X)
     cali_prob_test_w = clf.predict_proba(Test_X)
     
@@ -530,157 +417,7 @@ for clf in classifiers_calib_w:
     calib_probability_train_w.append(cali_prob_train_w)
     calib_probability_test_w.append(cali_prob_test_w)
 
-#%%
-#In-sample
 
-#create PR for in-sample classification
-axis_title = ['Linear kernel, C=0.001',
-              'Gaussian kernel, C=0.001',
-              'Sigmoid kernel, C=0.001',
-              'Polynomial kernel, C=0.1']
-fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(15,10))
-# fig.suptitle('In-sample accuracy (Scenario II, b = -3)',fontsize=20)
-# fig.suptitle('In-sample accuracy (Scenario II, b = -5)',fontsize=20)
-# fig.suptitle('In-sample accuracy (Scenario II, b = -7)',fontsize=20)
-fig.suptitle('In-sample accuracy (Scenario I, b = -3)',fontsize=20)
-# fig.suptitle('In-sample accuracy (Scenario I, b = -5)',fontsize=20)
-# fig.suptitle('In-sample accuracy (Scenario III, b = -3)',fontsize=20)
-# fig.suptitle('In-sample accuracy (Scenario III, b = -5)',fontsize=20)
-# fig.suptitle('In-sample accuracy (Scenario III, b = -7)',fontsize=20)
-
-
-for clf, ax, title in zip(classifiers_calib, axes.flatten(), axis_title):
-    plot_precision_recall_curve(clf, 
-                         Train_X, 
-                          Train_Y,
-                          pos_label = 1,
-                          response_method='predict_proba',
-                          ax=ax)
-    ax.title.set_text(title)
-            
-plt.tight_layout()  
-# plt.savefig('svm_in_med_3_pr.png', dpi=300)
-# plt.savefig('svm_in_med_5_pr.png', dpi=300) 
-# plt.savefig('svm_in_med_7_pr.png', dpi=300) 
-plt.savefig('svm_in_small_3_pr.png', dpi=300) 
-# plt.savefig('svm_in_small_5_pr.png', dpi=300)  
-plt.show()
-
-#%%
-
-#Out-of-sample
-
-#create PR curve for in-sample classification
-axis_title = ['Linear kernel, C=0.001',
-              'Gaussian kernel, C=0.001',
-              'Sigmoid kernel, C=0.001',
-              'Polynomial kernel, C=0.1']
-fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(15,10))
-# fig.suptitle('Out-of-sample accuracy (Scenario II, b = -3)',fontsize=20)
-# fig.suptitle('Out-of-sample accuracy (Scenario II, b = -5)',fontsize=20)
-# fig.suptitle('Out-of-sample accuracy (Scenario II, b = -7)',fontsize=20)
-fig.suptitle('Out-of-sample accuracy (Scenario I, b = -3)',fontsize=20)
-# fig.suptitle('Out-of-sample accuracy (Scenario I, b = -5)',fontsize=20)
-# fig.suptitle('Out-of-sample accuracy (Scenario III, b = -3)',fontsize=20)
-# fig.suptitle('Out-of-sample accuracy(Scenario III, b = -5)',fontsize=20)
-# fig.suptitle('Out-of-sample accuracy (Scenario III, b = -7)',fontsize=20)
-
-
-for clf, ax, title in zip(classifiers_calib, axes.flatten(), axis_title):
-    plot_precision_recall_curve(clf, 
-                          Test_X, 
-                          Test_Y,
-                          pos_label = 1,
-                          response_method='predict_proba',
-                          ax=ax)
-    ax.title.set_text(title)
-            
-plt.tight_layout()  
-# plt.savefig('svm_out_med_3_pr.png', dpi=300)
-# plt.savefig('svm_out_med_5_pr.png', dpi=300) 
-# plt.savefig('svm_out_med_7_pr.png', dpi=300) 
-plt.savefig('svm_out_small_3_pr.png', dpi=300) 
-# plt.savefig('svm_out_small_5_pr.png', dpi=300) 
-plt.show()
-#%%
-
-#In-sample
-
-#create  PR curve for in-sample classification
-axis_title = ['Linear kernel, C=1 (DEC)',
-              'Gaussian kernel, C=0.1  (DEC)',
-              'Sigmoid kernel, C=0.1 (DEC)',
-              'Polynomial kernel, C=0.001 (DEC)']
-fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(15,10))
-# fig.suptitle('In-sample accuracy (Scenario II, b = -3)',fontsize=20)
-# fig.suptitle('In-sample accuracy, DEC (Scenario II, b = -5)',fontsize=20)
-# fig.suptitle('In-sample accuracy, DEC (Scenario II, b = -7)',fontsize=20)
-# fig.suptitle('In-sample accuracy, DEC (Scenario I, b = -3)',fontsize=20)
-# fig.suptitle('In-sample accuracy, DEC (Scenario I, b = -5)',fontsize=20)
-# fig.suptitle('In-sample accuracy, DEC (Scenario III, b = -3)',fontsize=20)
-# fig.suptitle('In-sample accuracy, DEC (Scenario III, b = -5)',fontsize=20)
-fig.suptitle('In-sample accuracy, DEC (Scenario III, b = -7)',fontsize=20)
-
-
-for clf, ax, title in zip(classifiers_calib_w, axes.flatten(), axis_title):
-    plot_precision_recall_curve(clf, 
-                         Train_X, 
-                          Train_Y,
-                          pos_label = 1,
-                          response_method='predict_proba',
-                          ax=ax)
-    ax.title.set_text(title)
-            
-plt.tight_layout()  
-# plt.savefig('svm_in_med_3_pr_w.png', dpi=300)
-# plt.savefig('svm_in_med_5_pr_w.png', dpi=300) 
-# plt.savefig('svm_in_med_7_pr_w.png', dpi=300) 
-# plt.savefig('svm_in_small_3_pr_w.png', dpi=300) 
-# plt.savefig('svm_in_small_5_pr_w.png', dpi=300)
-# plt.savefig('svm_in_lar_3_pr_w.png', dpi=300)
-# plt.savefig('svm_in_lar_5_pr_w.png', dpi=300) 
-plt.savefig('svm_in_lar_7_pr_w.png', dpi=300)  
-plt.show()
-
-#%%
-
-#Out-of-sample
-
-#create  PR curve for in-sample classification
-axis_title = ['Linear kernel, C=1 (DEC)',
-              'Gaussian kernel, C=0.1  (DEC)',
-              'Sigmoid kernel, C=0.1 (DEC)',
-              'Polynomial kernel, C=0.001 (DEC)']
-fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(15,10))
-# fig.suptitle('Out-of-sample accuracy (Scenario II, b = -3)',fontsize=20)
-# fig.suptitle('Out-of-sample accuracy (Scenario II, b = -5)',fontsize=20)
-# fig.suptitle('Out-of-sample accuracy (Scenario II, b = -7)',fontsize=20)
-# fig.suptitle('Out-of-sample accuracy (Scenario I, b = -3)',fontsize=20)
-# fig.suptitle('Out-of-sample accuracy (Scenario I, b = -5)',fontsize=20)
-# fig.suptitle('Out-of-sample accuracy (Scenario III, b = -3)',fontsize=20)
-# fig.suptitle('Out-of-sample accuracy (Scenario III, b = -5)',fontsize=20)
-fig.suptitle('Out-of-sample accuracy (Scenario III, b = -7)',fontsize=20)
-
-
-for clf, ax, title in zip(classifiers_calib_w, axes.flatten(), axis_title):
-    plot_precision_recall_curve(clf, 
-                          Test_X, 
-                          Test_Y,
-                          pos_label = 1,
-                          response_method='predict_proba',
-                          ax=ax)
-    ax.title.set_text(title)
-            
-plt.tight_layout()  
-# plt.savefig('svm_out_med_3_pr_w.png', dpi=300)
-# plt.savefig('svm_out_med_5_pr_w.png', dpi=300) 
-# plt.savefig('svm_out_med_7_pr_w.png', dpi=300) 
-# plt.savefig('svm_out_small_3_pr_w.png', dpi=300) 
-# plt.savefig('svm_out_small_5_pr_w.png', dpi=300)
-# plt.savefig('svm_out_lar_3_pr_w.png', dpi=300)
-# plt.savefig('svm_out_lar_5_pr_w.png', dpi=300) 
-plt.savefig('svm_out_lar_7_pr_w.png', dpi=300) 
-plt.show()
 #%%
 #Export result
 
@@ -787,3 +524,27 @@ df_svm_pro_tr.to_csv (r'C://Users//Work//OneDrive//Universitetsstudier//Kurser//
 df_svm_pro_test.to_csv (r'C://Users//Work//OneDrive//Universitetsstudier//Kurser//HT2019//Kandidatuppsats//Rare events//DATA//Simulated_data//standard_svm_test.csv', index = False, header=True)
 df_svm_pro_tr_DEC.to_csv (r'C://Users//Work//OneDrive//Universitetsstudier//Kurser//HT2019//Kandidatuppsats//Rare events//DATA//Simulated_data//DEC_svm_tr.csv', index = False, header=True)
 df_svm_pro_test_DEC.to_csv (r'C://Users//Work//OneDrive//Universitetsstudier//Kurser//HT2019//Kandidatuppsats//Rare events//DATA//Simulated_data//DEC_svm_test.csv', index = False, header=True)
+
+#%%
+
+#calibration curve train
+
+fop, mpv = calibration_curve(Train_Y, calib_probability_train[1]['Positive'], n_bins=10) #train
+fop, mpv = calibration_curve(Train_Y, calib_probability_train_w[0]['Positive'], n_bins=10) #train_w
+
+# plot perfectly calibrated
+plt.plot([0, 1], [0, 1], linestyle='--')
+# plot calibrated reliability
+plt.plot(mpv, fop, marker='.')
+
+#%%
+
+#calibration curve test
+
+fop, mpv = calibration_curve(Test_Y, calib_probability_test[1]['Positive'], n_bins=10) #test
+fop, mpv = calibration_curve(Test_Y, calib_probability_test_w[0]['Positive'], n_bins=10) #test
+# plot perfectly calibrated
+plt.plot([0, 1], [0, 1], linestyle='--')
+# plot calibrated reliability
+plt.plot(mpv, fop, marker='.')
+

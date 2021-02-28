@@ -359,7 +359,7 @@ pcloglog.pr.tr$Group <- 'C log-log'
 
 GLM.pr.tr <- rbind.data.frame(plogit.pr.tr, prelogit.pr.tr, pcloglog.pr.tr)
 
-pr.GLM.tr <- evalm(GLM.pr.tr,fsize=20,dlinecol='black',plots = c('pr','cc'))
+pr.GLM.tr <- evalm(GLM.pr.tr,fsize=20,dlinecol='black',plots = c('pr','cc'),bins = 5)
 
 #redefine Y.test
 Y.test.char <- as.data.frame(Y.Test)
@@ -376,10 +376,14 @@ pcloglog.test$Group <- 'C log-log'
 
 GLM.pr.test <- rbind.data.frame(plogit.pr.test, prelogit.pr.test, pcloglog.test)
 
-pr.GLM.test <- evalm(GLM.pr.test,fsize=20,dlinecol='black',plots = c('pr','cc'))
+pr.GLM.test <- evalm(GLM.pr.test,fsize=20,dlinecol='black',plots = c('pr','cc'),bins = 5)
 
 
 ############ Probabilities from SVM ###############
+# # uncalibrated probability
+# path_SVM <- 'C:\\Users\\Work\\OneDrive\\Universitetsstudier\\Kurser\\HT2019\\Kandidatuppsats\\Rare events\\DATA\\SVM_prob\\MID_raw\\' 
+
+# calibrated probability
 path_SVM <- 'C:\\Users\\Work\\OneDrive\\Universitetsstudier\\Kurser\\HT2019\\Kandidatuppsats\\Rare events\\DATA\\SVM_prob\\MID\\'
 
 
@@ -402,10 +406,17 @@ DEC.SVM.train <- DEC.SVM.train[, col_order]
 standardSVM.test <- standardSVM.test[, col_order]
 DEC.SVM.test <- DEC.SVM.test[, col_order]
 
-pr.SVM.train <- evalm(standardSVM.train,fsize=20,dlinecol='black',plots = c('pr','cc'))
-pr.SVM.test <- evalm(standardSVM.test,fsize=20,dlinecol='black',plots = c('pr','cc'))
-pr.DEC.train <- evalm(DEC.SVM.train,fsize=20,dlinecol='black',plots = c('pr','cc'))
-pr.DEC.test <- evalm(DEC.SVM.test,fsize=20,dlinecol='black',plots = c('pr','cc'))
+# # uncalibrated probabilities
+# pr.SVM.train <- evalm(standardSVM.train,fsize=20,dlinecol='black',plots = c('pr','cc'),bins = 10)
+# pr.SVM.test <- evalm(standardSVM.test,fsize=20,dlinecol='black',plots = c('pr','cc'),bins = 10)
+# pr.DEC.train <- evalm(DEC.SVM.train,fsize=20,dlinecol='black',plots = c('pr','cc'),bins = 10)
+# pr.DEC.test <- evalm(DEC.SVM.test,fsize=20,dlinecol='black',plots = c('pr','cc'),bins = 10)
+
+# calibrated probabilities 
+pr.SVM.train <- evalm(standardSVM.train,fsize=20,dlinecol='black',plots = c('pr','cc'),bins = 5)
+pr.SVM.test <- evalm(standardSVM.test,fsize=20,dlinecol='black',plots = c('pr','cc'),bins = 5)
+pr.DEC.train <- evalm(DEC.SVM.train,fsize=20,dlinecol='black',plots = c('pr','cc'),bins = 5)
+pr.DEC.test <- evalm(DEC.SVM.test,fsize=20,dlinecol='black',plots = c('pr','cc'),bins = 5)
 
 
 ########## Generate ROC curves for comparison between GLM and SVM ##########
@@ -422,7 +433,7 @@ roc.GLM_SVM.test <- evalm(GLM_SVM.test,fsize=20,dlinecol='black', plots = 'r') #
 roc.GLM_DEC.train <- evalm(GLM_DEC.train,fsize=20,dlinecol='black', plots = 'r') #GLM vs. SVM-DEC train
 roc.GLM_DEC.test <- evalm(GLM_DEC.test,fsize=20,dlinecol='black', plots = 'r') #GLM vs. SVM-DEC test
 
-#Save all plots created
-plots.dir.path <- list.files(tempdir(), pattern="rs-graphics", full.names = TRUE); 
-plots.png.paths <- list.files(plots.dir.path, pattern=".png", full.names = TRUE)
-file.copy(from=plots.png.paths, to="C:\\Users\\Work\\OneDrive\\Universitetsstudier\\Kurser\\HT2019\\Kandidatuppsats\\Rare events\\Figures")
+# #Save all plots created
+# plots.dir.path <- list.files(tempdir(), pattern="rs-graphics", full.names = TRUE); 
+# plots.png.paths <- list.files(plots.dir.path, pattern=".png", full.names = TRUE)
+# file.copy(from=plots.png.paths, to="C:\\Users\\Work\\OneDrive\\Universitetsstudier\\Kurser\\HT2019\\Kandidatuppsats\\Rare events\\Figures")

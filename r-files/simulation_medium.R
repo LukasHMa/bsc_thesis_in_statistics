@@ -1,11 +1,11 @@
 rm(list = ls())
 
 library(kernlab)
-library(LiblineaR)
 library(ggplot2)
 library(MASS)
-library(pROC) # to construct ROC curve
-library(ROCR) 
+library(devtools)
+library(caret) #confusion matrix
+library(MLeval)
 
 Sys.setlocale("LC_ALL","English")
 

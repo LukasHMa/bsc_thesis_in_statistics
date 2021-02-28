@@ -2,7 +2,8 @@
 library(ggplot2)
 library(MASS)
 library(kernlab)       
-library(ISLR)         
+library(ISLR)
+library(caret)
 Sys.setlocale("LC_ALL","English")
 ####Sigmoid function #####
 
@@ -207,3 +208,6 @@ dat <- data.frame(x=x, y=as.factor(y))
 
 kernfit <- ksvm(x, y, type = "C-svc", kernel = 'vanilladot')
 plot(kernfit, data = x)
+
+
+
